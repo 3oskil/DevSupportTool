@@ -89,27 +89,25 @@ def identify_totals(form):
                         item = buf_item + '_' + str(item_part)
                     totals.append(item)
             i += 1
-            
     return totals
 
 
-def identify_tables(form, tables):
-    form_tables = []
+def identify_tables(cols_form, rows_form, tables):
+    tab_tables = []
     for table_name in tables:
-        if table_name in map((lambda s: s.strip().lower()), map(str, form.iloc[0])):
-            form_tables.append(table_name)
-            
-    return form_tables
+        first_row = map(lambda s: str(s).strip().lower(), cols_form.iloc[0].to_list() + rows_form.iloc[0].to_list())
+        if table_name in first_row:
+            tab_tables.append(table_name)
+    return tab_tables
 
 
-def clean_form(form, form_tables):
+def clean_form(form, tab_tables):
     drop_columns = []
     for i, value in enumerate(form.iloc[0].values):
-        if isinstance(value, str) and value.strip().lower() not in form_tables + ['col num', 'row num']:
+        if isinstance(value, str) and value.strip().lower() not in tab_tables + ['col num', 'row num']:
             drop_columns.append(i)
 
     clear_form = form.drop(columns=(form.columns[drop_columns])).reset_index(drop=True)
-    
     return clear_form
 
 
@@ -126,17 +124,17 @@ def split_not(actual_table, raw_value, map_table):
     clear_out_not = [a for b in list(map((lambda string: string.strip().split(', ')), out_not)) for a in iter(b) if a]
     value_in_not = add_fill_values(actual_table, clear_in_not, map_table)
     value_out_not = add_fill_values(actual_table, clear_out_not, map_table)
-    
     return value_in_not, value_out_not
 
 
 def get_actual_table(t, f, tables, joins):
     t_names = tuple(set([item for sublist in [v for k, v in joins.items() if t in v] for item in iter(sublist)]))
     t_dfs = {}
+    
     for t_name in t_names:
         if not 'map' in t_name and not 'lkup' in t_name:
             t_dfs[t_name] = tables[t_name]
-    
+            
     if f in t_dfs[t]['Column Name'].values:
         actual_table = t
     else:
@@ -147,7 +145,6 @@ def get_actual_table(t, f, tables, joins):
                 break
         else:
             actual_table = t
-    
     return actual_table
 
 
@@ -168,7 +165,6 @@ def fill_not(actual_table, value_in_not, map_table):
         allowed_list = [val for val in full_allowed_list if val not in value_in_not]
     else:
         return ('NOT', value_in_not)
-    
     return allowed_list
 
 
@@ -189,7 +185,6 @@ def main_fill_values(field, raw_value, tables, database, jdx, joins):
                 value = fill_not(actual_table, value_in_not, map_table)
         else:
             value = add_fill_values(actual_table, raw_value, map_table)
-    
     return actual_table, value
 
 
@@ -203,7 +198,6 @@ def add_fill_values(actual_table, intl_raw_value, map_table):
             for i, row in map_table.iterrows():
                 if isinstance(row[col_name], str) and v in row[col_name]:
                     intl_value.append(row['Code'])
-
         else:
             intl_value.append(v)
 
@@ -241,15 +235,15 @@ def is_intersects(term1, term2):
     return t1[0] <= t2[1] and t1[1] >= t2[0]
 
 
-def identify_non_reportable(form_tables, value):
+def identify_non_reportable(tab_tables, value):
     without_nones = {k: v for k, v in value.items() if v != None}
     rep = set(map((lambda x: x.split('.')[0]), list(without_nones.keys())))
-    non_rep = [i for i in form_tables if i not in rep]
+    non_rep = [i for i in tab_tables if i not in rep]
     
     return non_rep
 
 
-def process_items(items, form_tables, joins):
+def process_items(items, tab_tables, joins):
     all_tables = set()
     for v in items.values():
         for k1 in v.keys():
@@ -276,14 +270,14 @@ def process_items(items, form_tables, joins):
     return items_merged, non_reportable
 
 
-def set_items(form, form_tables, tables, database, totals, jdx, logic):
+def set_items(form, tab_tables, tables, database, totals, jdx, logic):
     tables_id, fields_id = dict(), dict()
     fields, items = dict(), dict()
     joins = dict()
     for rec_iter, row in form.iterrows():
         if rec_iter == 0:
             for f_iter, j in enumerate(row):
-                if isinstance(j, str) and j.lower().strip() in form_tables:
+                if isinstance(j, str) and j.lower().strip() in tab_tables:
                     tables_id.setdefault(f_iter, j.lower().strip())
             
         if rec_iter == 1:
@@ -299,11 +293,12 @@ def set_items(form, form_tables, tables, database, totals, jdx, logic):
                     buf_key = k
                 else:
                     fields.setdefault(k, tables_id[buf_key] + '.' + fields_id[k])
-
-            for t in tables_id.values():
+            
+            for t in tab_tables:
                 if t in logic['core'].keys():
                     joins[t] = logic['core'][t] + logic[jdx][t]
-        
+                    
+            
         if rec_iter > 1:
             if pd.isna(row[0]):
                 item_part += 1
@@ -327,7 +322,7 @@ def set_items(form, form_tables, tables, database, totals, jdx, logic):
                         items[item].setdefault('.'.join([t, field.split('.')[1]]), value)
 
 
-    items_merged, non_reportable = process_items(items, form_tables, joins)
+    items_merged, non_reportable = process_items(items, tab_tables, joins)
     return items_merged, non_reportable
 
 
