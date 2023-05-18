@@ -60,17 +60,21 @@ def initialize_tab(report_tabs, tab_name):
 
 
 def initialize_location(tab):
-    row_loc, row_name = [tab[tab == 'Row Num'].stack().index.tolist()[0], (len(tab) - 1, tab.columns[-1])], 'Rows'
-    col_loc, col_name = [tab[tab == 'Col Num'].stack().index.tolist()[0], (row_loc[0][0] - 2, tab.columns[-1])], 'Columns'
-    return (col_loc, col_name), (row_loc, row_name)
+    row_loc = [tab[tab == 'Row Num'].stack().index.tolist()[0], (len(tab) - 1, tab.columns[-1])]
+    col_loc = [tab[tab == 'Col Num'].stack().index.tolist()[0], (row_loc[0][0] - 2, tab.columns[-1])]
+    return col_loc, row_loc
 
 
 def initialize_form(location, tab):
-    form = tab.loc[location[0][0]:location[1][0], location[0][1]:].dropna(axis=1, how='all')
     if tab.loc[location[0]] not in ('Col Num', 'Row Num'):
         raise Exception(f'Wrong location {location[0]}, value should be "Col Num" or "Row Num", not {tab.loc[location[0]]}')
-    if tab.loc[location[0]] == 'Col Num':
-        form.drop(columns=[form.columns[1]])
+    
+    raw_form = tab.loc[location[0][0]:location[1][0], location[0][1]:]
+    raw_form = raw_form.dropna(axis=0, how='all').dropna(axis=1, how='all')
+    form = raw_form.drop(columns=raw_form.columns[raw_form.iloc[:2].isnull().all()])
+    
+#     if tab.loc[location[0]] == 'Col Num':
+#         form.drop(columns=[form.columns[1]])
     return form
 
 
@@ -130,7 +134,6 @@ def split_not(actual_table, raw_value, map_table):
 def get_actual_table(t, f, tables, joins):
     t_names = tuple(set([item for sublist in [v for k, v in joins.items() if t in v] for item in iter(sublist)]))
     t_dfs = {}
-    
     for t_name in t_names:
         if not 'map' in t_name and not 'lkup' in t_name:
             t_dfs[t_name] = tables[t_name]
