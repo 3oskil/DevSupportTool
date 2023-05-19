@@ -62,17 +62,17 @@ def initialize_tab(report_tabs, tab_name):
 def initialize_location(tab):
     row_loc = [tab[tab == 'Row Num'].stack().index.tolist()[0], (len(tab) - 1, tab.columns[-1])]
     col_loc = [tab[tab == 'Col Num'].stack().index.tolist()[0], (row_loc[0][0] - 2, tab.columns[-1])]
-    return col_loc, row_loc
+    sht_loc = [tab[tab == 'Sht Name'].stack().index.tolist()[0], (col_loc[0][0] - 2, tab.columns[-1])]
+    return sht_loc, col_loc, row_loc
 
 
 def initialize_form(location, tab):
-    if tab.loc[location[0]] not in ('Col Num', 'Row Num'):
+    if tab.loc[location[0]] not in ('Sht Name', 'Col Num', 'Row Num'):
         raise Exception(f'Wrong location {location[0]}, value should be "Col Num" or "Row Num", not {tab.loc[location[0]]}')
     
     raw_form = tab.loc[location[0][0]:location[1][0], location[0][1]:]
     raw_form = raw_form.dropna(axis=0, how='all').dropna(axis=1, how='all')
     form = raw_form.drop(columns=raw_form.columns[raw_form.iloc[:2].isnull().all()])
-    
 #     if tab.loc[location[0]] == 'Col Num':
 #         form.drop(columns=[form.columns[1]])
     return form
@@ -96,10 +96,11 @@ def identify_totals(form):
     return totals
 
 
-def identify_tables(cols_form, rows_form, tables):
+def identify_tables(shts_form, cols_form, rows_form, tables):
     tab_tables = []
     for table_name in tables:
-        first_row = map(lambda s: str(s).strip().lower(), cols_form.iloc[0].to_list() + rows_form.iloc[0].to_list())
+        forms = shts_form.iloc[0].to_list() + cols_form.iloc[0].to_list() + rows_form.iloc[0].to_list()
+        first_row = map(lambda s: str(s).strip().lower(), forms)
         if table_name in first_row:
             tab_tables.append(table_name)
     return tab_tables
@@ -137,7 +138,6 @@ def get_actual_table(t, f, tables, joins):
     for t_name in t_names:
         if not 'map' in t_name and not 'lkup' in t_name:
             t_dfs[t_name] = tables[t_name]
-            
     if f in t_dfs[t]['Column Name'].values:
         actual_table = t
     else:
@@ -282,7 +282,7 @@ def set_items(form, tab_tables, tables, database, totals, jdx, logic):
             for f_iter, j in enumerate(row):
                 if isinstance(j, str) and j.lower().strip() in tab_tables:
                     tables_id.setdefault(f_iter, j.lower().strip())
-            
+        
         if rec_iter == 1:
             num = list(tables_id.keys())[0]
             for j in row[num:]:
@@ -300,7 +300,7 @@ def set_items(form, tab_tables, tables, database, totals, jdx, logic):
             for t in tab_tables:
                 if t in logic['core'].keys():
                     joins[t] = logic['core'][t] + logic[jdx][t]
-                    
+            
             
         if rec_iter > 1:
             if pd.isna(row[0]):
