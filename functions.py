@@ -274,6 +274,10 @@ def process_items(items, tab_tables, joins):
 
 
 def set_items(form, tab_tables, tables, database, totals, jdx, logic):
+    if len(form.columns) == 1:
+        items, non_reportable = form.iloc[:, 0].tolist()[1:], None
+        return items, non_reportable
+    
     tables_id, fields_id = dict(), dict()
     fields, items = dict(), dict()
     joins = dict()
@@ -282,7 +286,7 @@ def set_items(form, tab_tables, tables, database, totals, jdx, logic):
             for f_iter, j in enumerate(row):
                 if isinstance(j, str) and j.lower().strip() in tab_tables:
                     tables_id.setdefault(f_iter, j.lower().strip())
-        
+                    
         if rec_iter == 1:
             num = list(tables_id.keys())[0]
             for j in row[num:]:
@@ -300,8 +304,7 @@ def set_items(form, tab_tables, tables, database, totals, jdx, logic):
             for t in tab_tables:
                 if t in logic['core'].keys():
                     joins[t] = logic['core'][t] + logic[jdx][t]
-            
-            
+             
         if rec_iter > 1:
             if pd.isna(row[0]):
                 item_part += 1
@@ -358,6 +361,9 @@ def identify_interval_fields(items):
 
 
 def analyse_overlaps(items):
+    if not isinstance(items, dict):
+        return None
+    
     overlaps = {x: dict() for x in items.keys()}
     interval_fields = identify_interval_fields(items)
     for t, v in items.items():
