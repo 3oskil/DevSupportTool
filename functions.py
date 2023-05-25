@@ -157,6 +157,10 @@ def get_map_table(actual_table, f, tables, database):
         map_table_name = table[table['Column Name'] == f]['Data Type'].values[0].lower()
         if 'map' in map_table_name or 'lkup' in map_table_name:
             return database[map_table_name]
+        comments = table[table['Column Name'] == f]['Comments'].values[0].lower()
+        if 'map' in comments or 'lkup' in comments:
+            matches = {i: database[i] for i in database.keys() if i in comments}
+            return matches
         return
     except:
         return
@@ -164,7 +168,10 @@ def get_map_table(actual_table, f, tables, database):
 
 def fill_not(actual_table, value_in_not, map_table):
     if map_table is not None:
-        full_allowed_list = map_table.iloc[:, 0].values
+        if isinstance(map_table, dict):
+            full_allowed_list = map_table['map country'].iloc[:, 0].values
+        else:
+            full_allowed_list = map_table.iloc[:, 0].values
         allowed_list = [val for val in full_allowed_list if val not in value_in_not]
     else:
         return ('NOT', value_in_not)
@@ -194,13 +201,26 @@ def main_fill_values(field, raw_value, tables, database, jdx, joins):
 def add_fill_values(actual_table, intl_raw_value, map_table):
     if not isinstance(intl_raw_value, list):
         intl_raw_value = list(map((lambda x: x.strip()), intl_raw_value.split(',')))
+        
     intl_value = []
     for v in intl_raw_value:
-        if 'ax_' in v and map_table is not None:
-            col_name = list(filter((lambda string: string.startswith('Parent')), map_table.columns))[0]
-            for i, row in map_table.iterrows():
-                if isinstance(row[col_name], str) and v in row[col_name]:
-                    intl_value.append(row['Code'])
+        if map_table is not None:
+            if 'ax_' in v:
+                col_name = list(filter(lambda string: string.startswith('Parent'), map_table.columns))[0]
+                for i, row in map_table.iterrows():
+                    if isinstance(row[col_name], str) and v in row[col_name]:
+                        intl_value.append(row['Code'])
+            elif v.lower() == 'eu':
+                map_country = map_table['map country']
+                intl_value.extend(map_country[map_country['EU Code'].isin(['EUROZONE', 'EU'])]['ISO Code - 3'])
+            elif v.lower() == 'eurozone':
+                map_country = map_table['map country']
+                intl_value.extend(map_country[map_country['EU Code'] == 'EUROZONE']['ISO Code - 3'])
+            elif v.lower() == 'omum':
+                lkup_int_org = map_table['lkup international organisation']
+                intl_value.extend(lkup_int_org[lkup_int_org['IE - OMUM'] == 'X']['Code (3 digit)'])
+            else:
+                intl_value.append(v)
         else:
             intl_value.append(v)
 
